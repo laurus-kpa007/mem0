@@ -1,5 +1,20 @@
 # Mem0 테스트 프로그램 설계 문서
 
+> 📊 **추가 시각화 자료**: 더 많은 Mermaid 다이어그램과 시퀀스 다이어그램은 [DESIGN_DIAGRAMS.md](./DESIGN_DIAGRAMS.md)를 참고하세요.
+>
+> 포함된 다이어그램:
+> - 🔄 사용자 워크플로우 (User Journey, Workflow)
+> - ⏱️ 시스템 초기화 시퀀스 (Initialization, mem0 Setup)
+> - 🚨 에러 처리 플로우 (Error Handling, Recovery)
+> - 🐳 Docker 배포 구조 (Container Architecture, Volumes)
+> - 🎯 상태 다이어그램 (State Machine, Lifecycle)
+> - 📊 전체 데이터 플로우 (End-to-End Flow)
+> - ⚡ 성능 최적화 전략 (Caching, Parallel Processing)
+> - 🔒 보안 흐름 (Validation Pipeline)
+> - 📝 로깅 및 모니터링 (Logging Flow)
+
+---
+
 ## 1. 프로젝트 개요
 
 Mem0와 Ollama를 통합한 지능형 메모리 기반 대화 시스템입니다. 사용자가 정보를 저장하고, 저장된 컨텍스트를 기반으로 자연스러운 대화를 나눌 수 있는 WebUI 애플리케이션입니다.

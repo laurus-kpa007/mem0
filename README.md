@@ -213,7 +213,10 @@ curl -X POST http://localhost:8000/api/chat \
 ## 📚 문서
 
 - [DESIGN.md](./DESIGN.md) - 상세 시스템 설계 문서
+- [DESIGN_DIAGRAMS.md](./DESIGN_DIAGRAMS.md) - 추가 Mermaid 다이어그램 및 시각화
 - [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) - 구현 가이드
+- [PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md) - 프로젝트 전체 요약
+- [HOW_MEM0_WORKS.md](./HOW_MEM0_WORKS.md) - mem0 동작 원리 상세 설명
 
 ## 🔍 핵심 개념
 
