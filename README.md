@@ -234,6 +234,7 @@ curl -X POST http://localhost:8000/api/chat \
 - [DESIGN_DIAGRAMS.md](./DESIGN_DIAGRAMS.md) - 추가 Mermaid 다이어그램 및 시각화 (30+ 다이어그램)
 - [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) - 구현 가이드 (백엔드/프론트엔드)
 - [TAG_FEATURE.md](./TAG_FEATURE.md) - AI 태그 기능 상세 문서
+- [KOREAN_SUPPORT.md](./KOREAN_SUPPORT.md) - **한글 지원 가이드 및 최적화 방법** 🇰🇷
 - [PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md) - 프로젝트 전체 요약
 - [HOW_MEM0_WORKS.md](./HOW_MEM0_WORKS.md) - mem0 동작 원리 상세 설명
 - [backend/README.md](./backend/README.md) - 백엔드 문서
@@ -302,6 +303,25 @@ LOG_LEVEL=INFO
 ```bash
 VITE_API_BASE_URL=http://localhost:8000
 ```
+
+## 🇰🇷 한글 지원
+
+기본 설정으로 한글이 부분적으로 지원됩니다:
+- ✅ **임베딩 & 검색**: nomic-embed-text는 한글 벡터 검색 우수
+- ⚠️ **LLM 응답**: llama3.2는 영어 중심 (한글 성능 제한적)
+
+**한글 성능 향상 방법:**
+```bash
+# 한글 최적화 모델 다운로드 (권장)
+ollama pull gemma2:9b
+
+# 환경 변수 변경
+echo "LLM_MODEL=gemma2:9b" >> backend/.env
+
+# 또는 WebUI Settings에서 모델 선택
+```
+
+자세한 내용: [KOREAN_SUPPORT.md](./KOREAN_SUPPORT.md) - 모델 비교, 설정 방법, 테스트 가이드
 
 ## 🐛 트러블슈팅
 
