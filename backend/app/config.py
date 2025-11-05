@@ -1,7 +1,7 @@
 """
 애플리케이션 설정
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 import os
 
@@ -29,13 +29,20 @@ class Settings(BaseSettings):
         "http://localhost:3000"
     ]
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"  # 추가 필드 무시 (Pydantic v2)
+    )
 
 
 settings = Settings()
 
 # 디렉토리 생성
-os.makedirs(os.path.dirname(settings.vector_store_path), exist_ok=True)
-os.makedirs(os.path.dirname(settings.history_db_path), exist_ok=True)
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(os.path.dirname(settings.vector_store_path) if settings.vector_store_path.startswith("..") else settings.vector_store_path, exist_ok=True)
+if settings.history_db_path:
+    history_dir = os.path.dirname(settings.history_db_path)
+    if history_dir:
+        os.makedirs(history_dir, exist_ok=True)

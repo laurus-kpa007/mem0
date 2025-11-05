@@ -81,9 +81,10 @@ ollama pull mxbai-embed-large:latest  # 대안
 ```bash
 # 한글 최적화 설정 (Gemma2 사용)
 OLLAMA_BASE_URL=http://localhost:11434
-LLM_MODEL=gemma2:9b                    # 변경
-EMBEDDING_MODEL=nomic-embed-text:latest  # 유지
-DATA_DIR=./data
+OLLAMA_DEFAULT_MODEL=gemma2:9b                    # 변경
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text:latest    # 유지
+VECTOR_STORE_PATH=../data/qdrant
+HISTORY_DB_PATH=../data/memory_history.db
 ```
 
 ### 방법 2: WebUI에서 변경
@@ -140,7 +141,7 @@ ollama pull gemma2:9b
 
 # 백엔드 환경변수 변경
 cd backend
-echo "LLM_MODEL=gemma2:9b" >> .env
+echo "OLLAMA_DEFAULT_MODEL=gemma2:9b" >> .env
 
 # 백엔드 재시작
 python -m app.main
@@ -202,8 +203,8 @@ services:
   backend:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
-      - LLM_MODEL=gemma2:9b          # 변경
-      - EMBEDDING_MODEL=nomic-embed-text:latest
+      - OLLAMA_DEFAULT_MODEL=gemma2:9b          # 변경
+      - OLLAMA_EMBEDDING_MODEL=nomic-embed-text:latest
 ```
 
 **Docker에서 모델 다운로드:**
@@ -279,8 +280,8 @@ ollama pull gemma2:9b
 ollama pull nomic-embed-text:latest
 
 # 2. 환경 변수 설정
-LLM_MODEL=gemma2:9b
-EMBEDDING_MODEL=nomic-embed-text:latest
+OLLAMA_DEFAULT_MODEL=gemma2:9b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text:latest
 
 # 3. 서버 재시작 및 테스트
 ```

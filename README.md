@@ -283,19 +283,19 @@ Ollama LLM 호출
 ### Backend (.env)
 
 ```bash
-# Ollama
+# Server Configuration
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
+LOG_LEVEL=INFO
+
+# Ollama Configuration
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_DEFAULT_MODEL=llama3.2:latest
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text:latest
 
-# Mem0
+# Data Storage (Mem0)
 VECTOR_STORE_PATH=../data/qdrant
 HISTORY_DB_PATH=../data/memory_history.db
-
-# Server
-BACKEND_PORT=8000
-BACKEND_HOST=0.0.0.0
-LOG_LEVEL=INFO
 ```
 
 ### Frontend (.env)
