@@ -9,9 +9,10 @@ Mem0와 Ollama를 활용한 메모리 기반 대화 시스템
 ### 주요 기능
 
 - 📝 **메모리 저장**: 텍스트를 mem0에 저장하고 자동으로 임베딩 생성
+- 🏷️ **AI 태그 제안**: LLM을 활용한 자동 태그 생성 및 관리
 - 🤖 **Ollama 통합**: 로컬 LLM 모델을 선택하여 사용
 - 💬 **컨텍스트 대화**: 저장된 메모리를 기반으로 답변 생성
-- 🌐 **WebUI**: React 기반의 직관적인 사용자 인터페이스
+- 🌐 **WebUI**: React + TypeScript 기반의 직관적인 사용자 인터페이스
 - ⚡ **FastAPI**: 고성능 REST API 백엔드
 
 ## 🏗️ 시스템 아키텍처
@@ -167,22 +168,36 @@ curl -X POST http://localhost:8000/api/chat \
 ### 3. WebUI 사용
 
 1. **http://localhost:5173** 접속
-2. **Memory 탭**: 메모리 추가/관리
-3. **Chat 탭**: AI와 대화
-4. **Settings 탭**: 모델 선택 및 설정
+2. **Chat 탭**: AI와 실시간 대화, 관련 메모리 표시
+3. **Memory 탭**:
+   - 텍스트 입력 및 메모리 추가
+   - "Suggest Tags" 버튼으로 AI 태그 제안 받기
+   - 제안된 태그를 클릭해서 추가하거나 수동 입력
+   - 저장된 메모리 목록 조회 및 삭제
+4. **Settings 탭**:
+   - Ollama 모델 선택 및 새로고침
+   - 사용자 ID 설정
+   - 메모리 사용 On/Off
+   - 메모리 검색 결과 수 조절
 
 ## 🔧 API 엔드포인트
 
 ### Memory APIs
 
-- `POST /api/memory/add` - 메모리 추가
+- `POST /api/memory/add` - 메모리 추가 (태그 메타데이터 포함)
 - `GET /api/memory/search` - 메모리 검색
 - `GET /api/memory/list` - 전체 메모리 조회
 - `DELETE /api/memory/{id}` - 메모리 삭제
 
+### Tag APIs 🏷️
+
+- `POST /api/memory/suggest-tags` - AI 태그 제안
+- `GET /api/memory/tags/autocomplete` - 태그 자동완성
+- `GET /api/memory/tags/popular` - 인기 태그 조회
+
 ### Chat APIs
 
-- `POST /api/chat` - 대화 생성
+- `POST /api/chat` - 메모리 기반 대화 생성
 
 ### Ollama APIs
 
@@ -206,17 +221,23 @@ curl -X POST http://localhost:8000/api/chat \
 ### Frontend
 - **React 18**: UI 라이브러리
 - **TypeScript**: 타입 안정성
-- **Zustand**: 상태 관리
-- **Tailwind CSS**: 스타일링
+- **Vite**: 빠른 빌드 도구
+- **Zustand**: 경량 상태 관리
+- **Tailwind CSS**: 유틸리티 기반 스타일링
+- **React Router**: SPA 라우팅
 - **Axios**: HTTP 클라이언트
+- **Lucide React**: 아이콘 라이브러리
 
 ## 📚 문서
 
-- [DESIGN.md](./DESIGN.md) - 상세 시스템 설계 문서
-- [DESIGN_DIAGRAMS.md](./DESIGN_DIAGRAMS.md) - 추가 Mermaid 다이어그램 및 시각화
-- [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) - 구현 가이드
+- [DESIGN.md](./DESIGN.md) - 상세 시스템 설계 문서 (Mermaid 다이어그램 포함)
+- [DESIGN_DIAGRAMS.md](./DESIGN_DIAGRAMS.md) - 추가 Mermaid 다이어그램 및 시각화 (30+ 다이어그램)
+- [IMPLEMENTATION_GUIDE.md](./IMPLEMENTATION_GUIDE.md) - 구현 가이드 (백엔드/프론트엔드)
+- [TAG_FEATURE.md](./TAG_FEATURE.md) - AI 태그 기능 상세 문서
 - [PROJECT_SUMMARY.md](./PROJECT_SUMMARY.md) - 프로젝트 전체 요약
 - [HOW_MEM0_WORKS.md](./HOW_MEM0_WORKS.md) - mem0 동작 원리 상세 설명
+- [backend/README.md](./backend/README.md) - 백엔드 문서
+- [frontend/README.md](./frontend/README.md) - 프론트엔드 문서
 
 ## 🔍 핵심 개념
 
@@ -328,24 +349,30 @@ CORS_ORIGINS=["http://localhost:5173"]
 
 ## 🛣️ 로드맵
 
-### Phase 1 ✅
+### Phase 1 ✅ (완료)
 - [x] 기본 아키텍처 설계
 - [x] mem0 통합
 - [x] Ollama 통합
 - [x] 기본 API 구현
+- [x] 상세 설계 문서 작성
 
-### Phase 2 (진행 중)
-- [ ] WebUI 구현
-- [ ] 메모리 관리 UI
-- [ ] 채팅 인터페이스
+### Phase 2 ✅ (완료)
+- [x] React + TypeScript WebUI 구현
+- [x] 메모리 관리 UI (추가/조회/삭제)
+- [x] 채팅 인터페이스 (실시간 대화, 관련 메모리 표시)
+- [x] 설정 페이지 (모델 선택, 사용자 설정)
+- [x] Tailwind CSS 스타일링
 
-### Phase 3 (계획)
-- [ ] 스트리밍 응답
-- [ ] 세션 관리
-- [ ] 태그 시스템
-- [ ] Export/Import
+### Phase 3 ✅ (완료)
+- [x] AI 태그 시스템 (LLM 기반 자동 제안)
+- [x] 태그 자동완성 및 인기 태그
+- [x] 하이브리드 태그 입력 (AI + 수동)
+- [x] 태그 메타데이터 저장
 
 ### Phase 4 (계획)
+- [ ] 스트리밍 응답 지원
+- [ ] 고급 세션 관리
+- [ ] Export/Import 기능
 - [ ] 통계 대시보드
 - [ ] 사용자 인증
 - [ ] 멀티 유저 지원
