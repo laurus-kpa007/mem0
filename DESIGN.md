@@ -16,43 +16,123 @@ Mem0와 Ollama를 통합한 지능형 메모리 기반 대화 시스템입니다
 
 ## 2. 시스템 아키텍처
 
+### 2.1 전체 시스템 구조
+
+```mermaid
+graph TB
+    subgraph Frontend["Frontend (React + TypeScript)"]
+        ChatView[Chat View<br/>대화 인터페이스]
+        MemoryView[Memory View<br/>메모리 관리]
+        SettingsView[Settings View<br/>모델 선택]
+    end
+
+    subgraph Backend["Backend (FastAPI)"]
+        API[API Endpoints<br/>REST API]
+
+        subgraph Services["Service Layer"]
+            MemService[Memory Service<br/>mem0 wrapper]
+            ChatService[Chat Service<br/>대화 처리]
+            OllamaService[Ollama Service<br/>LLM 통신]
+        end
+    end
+
+    subgraph External["External Services"]
+        subgraph Mem0["Mem0 Library"]
+            VectorDB[(Qdrant<br/>Vector DB)]
+            HistoryDB[(SQLite<br/>History)]
+        end
+
+        Ollama[Ollama Server<br/>llama3.2, mistral, gemma2]
+    end
+
+    %% Connections
+    Frontend -->|REST API<br/>JSON| API
+    API --> Services
+    MemService --> Mem0
+    ChatService --> MemService
+    ChatService --> OllamaService
+    OllamaService --> Ollama
+    MemService --> Ollama
+
+    style Frontend fill:#e1f5ff
+    style Backend fill:#fff4e1
+    style External fill:#f0f0f0
+    style Mem0 fill:#e8f5e9
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Frontend (WebUI)                      │
-│  ┌────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │ Chat View  │  │ Memory View  │  │  Settings View   │   │
-│  │            │  │              │  │  (Model Select)  │   │
-│  └────────────┘  └──────────────┘  └──────────────────┘   │
-│                        React/Vue.js                         │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ REST API (JSON)
-                            │
-┌───────────────────────────▼─────────────────────────────────┐
-│                    Backend (FastAPI)                         │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  API Endpoints                                        │  │
-│  │  - POST /api/memory/add                               │  │
-│  │  - GET  /api/memory/search                            │  │
-│  │  - POST /api/chat                                     │  │
-│  │  - GET  /api/ollama/models                            │  │
-│  └────────────┬──────────────────┬──────────────────────┘  │
-│               │                  │                          │
-│  ┌────────────▼────────┐  ┌─────▼──────────────────────┐  │
-│  │  Memory Manager     │  │  Ollama Integration       │  │
-│  │  (mem0 wrapper)     │  │  (LLM handler)            │  │
-│  └────────────┬────────┘  └─────┬──────────────────────┘  │
-└───────────────┼────────────────────┼─────────────────────────┘
-                │                    │
-    ┌───────────▼──────────┐  ┌─────▼─────────────┐
-    │    Mem0 Library      │  │  Ollama Server    │
-    │  ┌────────────────┐  │  │  - llama3.2       │
-    │  │ Vector Store   │  │  │  - mistral        │
-    │  │  (Qdrant)      │  │  │  - gemma2         │
-    │  └────────────────┘  │  │  - custom models  │
-    │  ┌────────────────┐  │  └───────────────────┘
-    │  │ SQLite History │  │
-    │  └────────────────┘  │
-    └─────────────────────┘
+
+### 2.2 데이터 흐름
+
+```mermaid
+flowchart LR
+    User([사용자]) --> UI[Web UI]
+    UI -->|HTTP Request| API[FastAPI]
+    API --> Service[Service Layer]
+    Service -->|저장/검색| Vector[(Qdrant)]
+    Service -->|LLM 호출| Ollama[Ollama]
+    Service -->|히스토리| SQLite[(SQLite)]
+
+    Vector -->|결과| Service
+    Ollama -->|응답| Service
+    Service -->|Response| API
+    API -->|JSON| UI
+    UI -->|화면 표시| User
+
+    style User fill:#4CAF50
+    style Vector fill:#2196F3
+    style Ollama fill:#FF9800
+    style SQLite fill:#9C27B0
+```
+
+### 2.3 계층별 구조
+
+```mermaid
+graph TB
+    subgraph "Presentation Layer"
+        A[React Components]
+        B[Zustand State]
+        C[Axios HTTP Client]
+    end
+
+    subgraph "API Layer"
+        D[FastAPI Endpoints]
+        E[Pydantic Models]
+    end
+
+    subgraph "Business Logic Layer"
+        F[Memory Service]
+        G[Chat Service]
+        H[Ollama Service]
+    end
+
+    subgraph "Data Layer"
+        I[mem0 Library]
+        J[Qdrant Vector DB]
+        K[SQLite DB]
+    end
+
+    subgraph "External Layer"
+        L[Ollama LLM Server]
+    end
+
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    E --> G
+    E --> H
+    F --> I
+    G --> F
+    G --> H
+    I --> J
+    I --> K
+    H --> L
+
+    style A fill:#61dafb
+    style D fill:#009688
+    style F fill:#3f51b5
+    style I fill:#4caf50
+    style L fill:#ff9800
 ```
 
 ---
@@ -82,6 +162,68 @@ Mem0와 Ollama를 통합한 지능형 메모리 기반 대화 시스템입니다
 ---
 
 ## 4. 데이터 모델
+
+### 4.0 데이터 모델 관계도
+
+```mermaid
+erDiagram
+    USER ||--o{ MEMORY : creates
+    USER ||--o{ CHAT_SESSION : has
+    CHAT_SESSION ||--o{ CHAT_MESSAGE : contains
+    CHAT_MESSAGE }o--o{ MEMORY : references
+    MEMORY ||--o{ MEMORY_HISTORY : tracks
+    USER ||--o{ USER_SETTINGS : has
+
+    USER {
+        string user_id PK
+        string name
+        datetime created_at
+    }
+
+    MEMORY {
+        string memory_id PK
+        string user_id FK
+        string content
+        float[] embedding
+        json metadata
+        datetime created_at
+    }
+
+    MEMORY_HISTORY {
+        string id PK
+        string memory_id FK
+        string old_memory
+        string new_memory
+        string event
+        string actor_id
+        datetime created_at
+    }
+
+    CHAT_SESSION {
+        string session_id PK
+        string user_id FK
+        string title
+        datetime created_at
+        datetime updated_at
+    }
+
+    CHAT_MESSAGE {
+        string message_id PK
+        string session_id FK
+        string role
+        string content
+        json related_memories
+        datetime timestamp
+    }
+
+    USER_SETTINGS {
+        string user_id PK
+        string default_model
+        int memory_limit
+        boolean use_memory
+        json preferences
+    }
+```
 
 ### 4.1 Memory Entry
 ```python
@@ -135,6 +277,73 @@ Mem0와 Ollama를 통합한 지능형 메모리 기반 대화 시스템입니다
 ---
 
 ## 5. API 설계
+
+### 5.0 API 엔드포인트 맵
+
+```mermaid
+graph TB
+    FastAPI[FastAPI Server<br/>:8000]
+
+    subgraph "Memory APIs"
+        M1[POST /api/memory/add<br/>메모리 추가]
+        M2[GET /api/memory/search<br/>메모리 검색]
+        M3[GET /api/memory/list<br/>전체 메모리]
+        M4[DELETE /api/memory/:id<br/>메모리 삭제]
+    end
+
+    subgraph "Chat APIs"
+        C1[POST /api/chat<br/>대화 생성]
+        C2[GET /api/chat/history<br/>대화 이력]
+    end
+
+    subgraph "Ollama APIs"
+        O1[GET /api/ollama/models<br/>모델 목록]
+        O2[POST /api/ollama/pull<br/>모델 다운로드]
+        O3[GET /api/ollama/status<br/>서버 상태]
+    end
+
+    subgraph "Utility APIs"
+        U1[GET /api/health<br/>헬스체크]
+        U2[GET /api/stats<br/>통계]
+    end
+
+    FastAPI --> M1
+    FastAPI --> M2
+    FastAPI --> M3
+    FastAPI --> M4
+    FastAPI --> C1
+    FastAPI --> C2
+    FastAPI --> O1
+    FastAPI --> O2
+    FastAPI --> O3
+    FastAPI --> U1
+    FastAPI --> U2
+
+    M1 -.->|사용| MemService[Memory Service]
+    M2 -.->|사용| MemService
+    M3 -.->|사용| MemService
+    M4 -.->|사용| MemService
+
+    C1 -.->|사용| ChatService[Chat Service]
+    C2 -.->|사용| ChatService
+
+    O1 -.->|사용| OllamaService[Ollama Service]
+    O2 -.->|사용| OllamaService
+    O3 -.->|사용| OllamaService
+
+    style FastAPI fill:#009688
+    style M1 fill:#4CAF50
+    style M2 fill:#4CAF50
+    style M3 fill:#4CAF50
+    style M4 fill:#4CAF50
+    style C1 fill:#2196F3
+    style C2 fill:#2196F3
+    style O1 fill:#FF9800
+    style O2 fill:#FF9800
+    style O3 fill:#FF9800
+    style U1 fill:#9C27B0
+    style U2 fill:#9C27B0
+```
 
 ### 5.1 Memory Management APIs
 
@@ -336,12 +545,107 @@ Response:
 
 ### 6.1 페이지 구조
 
+```mermaid
+graph TB
+    App[App.tsx<br/>메인 앱]
+
+    subgraph "Pages"
+        ChatPage[ChatPage<br/>'/chat']
+        MemoriesPage[MemoriesPage<br/>'/memories']
+        SettingsPage[SettingsPage<br/>'/settings']
+        StatsPage[StatsPage<br/>'/stats']
+    end
+
+    subgraph "Chat Components"
+        ChatView[ChatView<br/>채팅 인터페이스]
+        MessageList[MessageList<br/>메시지 목록]
+        MessageInput[MessageInput<br/>입력창]
+        MemoryContext[MemoryContext<br/>메모리 표시]
+    end
+
+    subgraph "Memory Components"
+        MemoryManager[MemoryManager<br/>메모리 관리]
+        MemoryCard[MemoryCard<br/>메모리 카드]
+        AddMemoryForm[AddMemoryForm<br/>추가 폼]
+        MemorySearch[MemorySearch<br/>검색]
+    end
+
+    subgraph "Settings Components"
+        ModelSelector[ModelSelector<br/>모델 선택]
+        SystemSettings[SystemSettings<br/>시스템 설정]
+    end
+
+    subgraph "Common Components"
+        Layout[Layout<br/>레이아웃]
+        Header[Header<br/>헤더]
+        Sidebar[Sidebar<br/>사이드바]
+    end
+
+    subgraph "State Management (Zustand)"
+        ChatStore[chatStore<br/>대화 상태]
+        MemoryStore[memoryStore<br/>메모리 상태]
+        SettingsStore[settingsStore<br/>설정]
+    end
+
+    subgraph "Services"
+        API[API Service<br/>Axios HTTP Client]
+    end
+
+    App --> Layout
+    Layout --> Header
+    Layout --> Sidebar
+    Layout --> ChatPage
+    Layout --> MemoriesPage
+    Layout --> SettingsPage
+    Layout --> StatsPage
+
+    ChatPage --> ChatView
+    ChatView --> MessageList
+    ChatView --> MessageInput
+    ChatView --> MemoryContext
+
+    MemoriesPage --> MemoryManager
+    MemoryManager --> MemoryCard
+    MemoryManager --> AddMemoryForm
+    MemoryManager --> MemorySearch
+
+    SettingsPage --> ModelSelector
+    SettingsPage --> SystemSettings
+
+    ChatView -.->|useState| ChatStore
+    MemoryManager -.->|useState| MemoryStore
+    ModelSelector -.->|useState| SettingsStore
+
+    ChatView -.->|API 호출| API
+    MemoryManager -.->|API 호출| API
+    ModelSelector -.->|API 호출| API
+
+    style App fill:#61dafb
+    style ChatStore fill:#764abc
+    style MemoryStore fill:#764abc
+    style SettingsStore fill:#764abc
+    style API fill:#FF6B6B
 ```
-/
-├── /chat              # 메인 채팅 인터페이스
-├── /memories          # 메모리 관리 페이지
-├── /settings          # 설정 (모델 선택, 시스템 설정)
-└── /stats             # 통계 및 모니터링
+
+### 6.1.1 라우팅 구조
+
+```mermaid
+graph LR
+    Root["/"] --> Chat["/chat<br/>채팅 페이지"]
+    Root --> Memories["/memories<br/>메모리 관리"]
+    Root --> Settings["/settings<br/>설정"]
+    Root --> Stats["/stats<br/>통계"]
+
+    Chat --> Session["/chat/:sessionId<br/>특정 세션"]
+
+    Settings --> Models["/settings/models<br/>모델 설정"]
+    Settings --> System["/settings/system<br/>시스템 설정"]
+
+    style Root fill:#4CAF50
+    style Chat fill:#2196F3
+    style Memories fill:#FF9800
+    style Settings fill:#9C27B0
+    style Stats fill:#F44336
 ```
 
 ### 6.2 주요 컴포넌트
@@ -517,6 +821,53 @@ mem0-test-program/
 
 ### 8.1 메모리 저장 플로우
 
+#### 시퀀스 다이어그램: 메모리 저장
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant UI as Web UI
+    participant API as FastAPI<br/>API Endpoint
+    participant MemService as Memory<br/>Service
+    participant Mem0 as mem0<br/>Library
+    participant Ollama as Ollama<br/>LLM
+    participant Vector as Qdrant<br/>Vector DB
+    participant SQLite as SQLite<br/>History DB
+
+    User->>UI: 텍스트 입력<br/>"나는 파이썬 개발자입니다"
+    UI->>API: POST /api/memory/add<br/>{content, user_id}
+
+    API->>MemService: add_memory()
+    MemService->>Mem0: memory.add(messages, user_id)
+
+    Note over Mem0: Step 1: Fact Extraction
+    Mem0->>Ollama: LLM 호출 (FACT_RETRIEVAL_PROMPT)<br/>"Extract facts from text"
+    Ollama-->>Mem0: Facts 반환<br/>["User is a Python developer"]
+
+    Note over Mem0: Step 2: 중복 확인
+    Mem0->>Vector: 기존 메모리 검색
+    Vector-->>Mem0: 검색 결과
+
+    Note over Mem0: Step 3: 임베딩 생성
+    Mem0->>Ollama: 임베딩 생성 요청<br/>(nomic-embed-text)
+    Ollama-->>Mem0: 임베딩 벡터<br/>[0.123, 0.456, ...]
+
+    Note over Mem0: Step 4: Vector DB 저장
+    Mem0->>Vector: 저장(memory, embedding, metadata)
+    Vector-->>Mem0: memory_id
+
+    Note over Mem0: Step 5: 히스토리 기록
+    Mem0->>SQLite: 이벤트 기록<br/>(created, memory_id, content)
+    SQLite-->>Mem0: 완료
+
+    Mem0-->>MemService: 저장 결과<br/>{id, memory, event: "created"}
+    MemService-->>API: 성공 응답
+    API-->>UI: {success: true, results}
+    UI-->>User: "메모리가 저장되었습니다"
+```
+
+#### 코드 구현
+
 ```python
 # backend/app/services/memory_service.py
 
@@ -590,6 +941,86 @@ class MemoryService:
 
 ### 8.2 채팅 플로우 (메모리 통합)
 
+#### 시퀀스 다이어그램: 메모리 기반 질의응답
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant UI as Web UI
+    participant API as FastAPI<br/>API Endpoint
+    participant ChatService as Chat<br/>Service
+    participant MemService as Memory<br/>Service
+    participant Mem0 as mem0<br/>Library
+    participant Vector as Qdrant<br/>Vector DB
+    participant Ollama as Ollama<br/>LLM
+
+    User->>UI: 질문 입력<br/>"내 직업이 뭐지?"
+    UI->>API: POST /api/chat<br/>{message, user_id, use_memory: true}
+
+    API->>ChatService: generate_response()
+
+    alt 메모리 사용 (use_memory = true)
+        Note over ChatService: Step 1: 관련 메모리 검색
+        ChatService->>MemService: search_memories(query, user_id, limit=5)
+        MemService->>Mem0: memory.search(query)
+
+        Mem0->>Ollama: 쿼리 임베딩 생성<br/>"내 직업이 뭐지?"
+        Ollama-->>Mem0: 쿼리 벡터<br/>[0.234, 0.567, ...]
+
+        Mem0->>Vector: 유사도 검색<br/>(vector_similarity)
+        Vector-->>Mem0: 관련 메모리 목록<br/>[{memory: "User is a Python developer", score: 0.89}]
+
+        Mem0-->>MemService: 검색 결과
+        MemService-->>ChatService: related_memories[]
+    end
+
+    Note over ChatService: Step 2: 컨텍스트 메시지 구성
+    ChatService->>ChatService: context_messages = [<br/>  {role: "system", content: "관련 정보: ..."},<br/>  {role: "user", content: "내 직업이 뭐지?"}]
+
+    Note over ChatService: Step 3: LLM 응답 생성
+    ChatService->>Ollama: POST /api/chat<br/>{model, messages}
+    Note over Ollama: LLM 추론<br/>(llama3.2)
+    Ollama-->>ChatService: 응답<br/>"당신은 파이썬 개발자입니다."
+
+    Note over ChatService: Step 4: 응답 구성
+    ChatService->>ChatService: response = {<br/>  response: "...",<br/>  related_memories: [...],<br/>  model_used: "llama3.2",<br/>  timestamp: "..."}
+
+    ChatService-->>API: 응답 데이터
+    API-->>UI: JSON Response
+    UI-->>User: AI 응답 표시<br/>(+ 사용된 메모리 표시)
+
+    Note over UI: 메모리 컨텍스트 표시<br/>"이 답변은 다음 메모리를 참고했습니다:<br/>- User is a Python developer (관련도: 89%)"
+```
+
+#### 데이터 흐름 비교
+
+```mermaid
+graph LR
+    subgraph "Without Memory"
+        Q1[질문: 내 직업이 뭐지?]
+        Q1 --> LLM1[Ollama LLM]
+        LLM1 --> A1[답변: 죄송하지만<br/>정보가 없습니다]
+    end
+
+    subgraph "With Memory"
+        Q2[질문: 내 직업이 뭐지?]
+        Q2 --> Search[메모리 검색]
+        Search --> Found[발견: User is<br/>Python developer]
+        Found --> Context[컨텍스트 추가]
+        Context --> LLM2[Ollama LLM]
+        LLM2 --> A2[답변: 당신은<br/>파이썬 개발자입니다]
+    end
+
+    style Q1 fill:#ffebee
+    style A1 fill:#ffcdd2
+    style Q2 fill:#e8f5e9
+    style Search fill:#c8e6c9
+    style Found fill:#a5d6a7
+    style A2 fill:#81c784
+```
+
+#### 코드 구현
+
 ```python
 # backend/app/services/chat_service.py
 
@@ -660,6 +1091,80 @@ class ChatService:
 ```
 
 ### 8.3 Ollama 통합
+
+#### Ollama 서비스 아키텍처
+
+```mermaid
+graph TB
+    subgraph "FastAPI Backend"
+        OllamaService[Ollama Service]
+        MemService[Memory Service]
+        ChatService[Chat Service]
+    end
+
+    subgraph "Ollama Server :11434"
+        subgraph "LLM Models"
+            Llama[llama3.2<br/>대화 생성]
+            Mistral[mistral<br/>대화 생성]
+            Gemma[gemma2<br/>대화 생성]
+        end
+
+        subgraph "Embedding Models"
+            Nomic[nomic-embed-text<br/>임베딩 생성]
+        end
+
+        API_Tags["/api/tags<br/>모델 목록"]
+        API_Chat["/api/chat<br/>채팅"]
+        API_Embed["/api/embeddings<br/>임베딩"]
+    end
+
+    OllamaService -->|모델 목록| API_Tags
+    OllamaService -->|채팅 요청| API_Chat
+    MemService -->|임베딩 요청| API_Embed
+
+    API_Chat --> Llama
+    API_Chat --> Mistral
+    API_Chat --> Gemma
+    API_Embed --> Nomic
+
+    ChatService --> OllamaService
+    MemService --> OllamaService
+
+    style OllamaService fill:#4CAF50
+    style API_Chat fill:#FF9800
+    style API_Embed fill:#2196F3
+    style Llama fill:#E91E63
+    style Nomic fill:#9C27B0
+```
+
+#### Ollama API 호출 시퀀스
+
+```mermaid
+sequenceDiagram
+    participant Backend as Backend<br/>Service
+    participant Ollama as Ollama<br/>Server
+    participant Model as LLM<br/>Model
+
+    Note over Backend,Model: 모델 목록 조회
+    Backend->>Ollama: GET /api/tags
+    Ollama-->>Backend: {models: [llama3.2, mistral, ...]}
+
+    Note over Backend,Model: 채팅 요청
+    Backend->>Ollama: POST /api/chat<br/>{model: "llama3.2", messages: [...]}
+    Ollama->>Model: 모델 로드 (최초 1회)
+    Note over Model: 토큰 생성
+    Model-->>Ollama: 생성된 응답
+    Ollama-->>Backend: {message: {content: "..."}}
+
+    Note over Backend,Model: 임베딩 생성
+    Backend->>Ollama: POST /api/embeddings<br/>{model: "nomic-embed-text", prompt: "..."}
+    Ollama->>Model: 임베딩 모델 실행
+    Note over Model: 벡터 생성
+    Model-->>Ollama: 임베딩 벡터
+    Ollama-->>Backend: {embedding: [0.1, 0.2, ...]}
+```
+
+#### 코드 구현
 
 ```python
 # backend/app/services/ollama_service.py
