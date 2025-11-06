@@ -42,4 +42,8 @@ def get_chat_service(
 def get_tag_service() -> TagService:
     """TagService 싱글톤 인스턴스 반환"""
     ollama_service = get_ollama_service()
-    return _get_tag_service(ollama_service)
+    # 설정된 기본 모델 사용
+    return _get_tag_service(
+        ollama_service=ollama_service,
+        default_model=settings.ollama_default_model
+    )

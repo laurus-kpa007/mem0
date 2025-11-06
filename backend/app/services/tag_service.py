@@ -12,12 +12,14 @@ logger = logging.getLogger(__name__)
 class TagService:
     """태그 생성 및 관리 서비스"""
 
-    def __init__(self, ollama_service):
+    def __init__(self, ollama_service, default_model: str = "llama3.2:latest"):
         """
         Args:
             ollama_service: Ollama 서비스 인스턴스
+            default_model: 태그 생성에 사용할 기본 LLM 모델
         """
         self.ollama_service = ollama_service
+        self.default_model = default_model
         self.tag_cache = {}  # 태그 빈도 캐시 (실제로는 DB 사용)
 
     async def suggest_tags(
@@ -41,9 +43,9 @@ class TagService:
             # 언어별 프롬프트 구성
             prompt = self._build_tag_generation_prompt(content, max_tags, language)
 
-            # LLM 호출
+            # LLM 호출 (설정된 모델 사용)
             response = await self.ollama_service.chat(
-                model="llama3.2:latest",
+                model=self.default_model,
                 messages=[
                     {
                         "role": "system",
@@ -99,41 +101,51 @@ class TagService:
 {content}
 \"\"\"
 
-태그 생성 규칙:
-1. 텍스트의 핵심 주제와 카테고리를 나타내는 태그 선택
-2. 구체적이고 의미있는 단어 사용
-3. 중복되거나 유사한 태그 제외
+요구사항:
+1. 태그는 단어나 짧은 구절로 작성
+2. 가장 중요하고 관련성 높은 개념 추출
+3. 중복 피하기
 4. {language_instruction}
-5. 태그는 단일 단어 또는 짧은 구문 (2-3 단어)
-6. 소문자 사용 (영어의 경우)
 
-반드시 다음 JSON 형식으로만 응답하세요:
+JSON 형식으로 답변:
 {{"tags": ["태그1", "태그2", "태그3"]}}
 
 JSON만 반환하고 다른 설명은 포함하지 마세요.
 """
-        return prompt
+        return prompt.strip()
 
     def _parse_tag_response(self, response: str) -> List[str]:
-        """LLM 응답에서 태그 추출"""
+        """LLM 응답에서 태그 파싱"""
         try:
-            # JSON 형식 찾기
-            json_match = re.search(r'\{[\s\S]*"tags"[\s\S]*\}', response)
-            if json_match:
-                data = json.loads(json_match.group())
+            # JSON 파싱 시도
+            if "{" in response and "}" in response:
+                json_start = response.find("{")
+                json_end = response.rfind("}") + 1
+                json_str = response[json_start:json_end]
+                data = json.loads(json_str)
                 return data.get("tags", [])
 
-            # JSON 배열만 있는 경우
-            array_match = re.search(r'\[[\s\S]*\]', response)
-            if array_match:
-                return json.loads(array_match.group())
+            # 배열 파싱 시도
+            if "[" in response and "]" in response:
+                array_start = response.find("[")
+                array_end = response.rfind("]") + 1
+                array_str = response[array_start:array_end]
+                return json.loads(array_str)
 
-            # 쉼표로 구분된 텍스트
-            tags = [tag.strip(' "\',') for tag in response.split(',')]
-            return [tag for tag in tags if tag]
+            # 줄바꿈으로 구분된 태그
+            lines = [line.strip() for line in response.split("\n")]
+            tags = []
+            for line in lines:
+                # 번호 매겨진 항목 제거 (1. 태그, - 태그 등)
+                cleaned = re.sub(r"^[\d\-\*\.]+\s*", "", line)
+                cleaned = cleaned.strip("\"'[](){}")
+                if cleaned and len(cleaned) > 1:
+                    tags.append(cleaned)
+
+            return tags[:10]  # 최대 10개까지만
 
         except Exception as e:
-            logger.warning(f"Failed to parse tags from response: {e}")
+            logger.warning(f"Failed to parse tag response: {e}")
             return []
 
     def _clean_tags(
@@ -142,29 +154,20 @@ JSON만 반환하고 다른 설명은 포함하지 마세요.
         max_tags: int,
         language: str
     ) -> List[str]:
-        """태그 정제 및 필터링"""
+        """태그 정제 및 정규화"""
         cleaned = []
 
         for tag in tags:
-            # 기본 정제
+            # 공백 제거 및 소문자 변환
             tag = tag.strip().lower()
 
-            # 빈 태그 제외
-            if not tag:
-                continue
+            # 특수문자 제거 (한글, 영문, 숫자, 공백만 허용)
+            tag = re.sub(r'[^\w\sㄱ-힣]', '', tag, flags=re.UNICODE)
 
-            # 특수문자 제거 (한글, 영문, 숫자, 하이픈, 언더스코어만 허용)
-            tag = re.sub(r'[^\w\sㄱ-ㅎㅏ-ㅣ가-힣-]', '', tag)
-
-            # 너무 짧거나 긴 태그 제외
-            if len(tag) < 2 or len(tag) > 20:
-                continue
-
-            # 중복 제외
-            if tag not in cleaned:
+            # 너무 길거나 짧은 태그 제외
+            if 2 <= len(tag) <= 30 and tag not in cleaned:
                 cleaned.append(tag)
 
-            # 최대 개수 도달
             if len(cleaned) >= max_tags:
                 break
 
@@ -175,27 +178,22 @@ JSON만 반환하고 다른 설명은 포함하지 마세요.
         if not tags:
             return 0.0
 
-        # 간단한 신뢰도: 태그가 텍스트에 나타나는 비율
+        # 간단한 휴리스틱: 태그가 원문에 포함되어 있는지 확인
         content_lower = content.lower()
         matches = sum(1 for tag in tags if tag.lower() in content_lower)
 
-        confidence = matches / len(tags) if tags else 0.0
-
-        # 태그 개수에 따른 가중치
-        if len(tags) >= 3:
-            confidence = min(confidence + 0.1, 1.0)
-
-        return round(confidence, 2)
+        return min(0.5 + (matches / len(tags)) * 0.5, 1.0)
 
     def _fallback_tag_extraction(self, content: str, max_tags: int) -> List[str]:
-        """폴백: 간단한 키워드 추출"""
-        # 불용어 제거 및 키워드 추출 (매우 간단한 구현)
-        stopwords = {
-            'ko': {'은', '는', '이', '가', '을', '를', '에', '의', '와', '과', '도', '만', '까지', '입니다', '습니다'},
-            'en': {'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but'}
-        }
+        """LLM 실패 시 간단한 키워드 추출"""
+        # 간단한 단어 분리
+        words = re.findall(r'\b[\w가-힣]+\b', content.lower(), re.UNICODE)
 
-        words = re.findall(r'\b\w+\b', content.lower())
+        # 불용어 제거 (간단한 예시)
+        stopwords = {
+            'ko': {'이', '그', '저', '것', '수', '등', '및', '를', '을', '가', '이', '은', '는', '에', '의', '와', '과'},
+            'en': {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
+        }
 
         # 불용어 제거
         all_stopwords = stopwords['ko'] | stopwords['en']
@@ -227,69 +225,69 @@ JSON만 반환하고 다른 설명은 포함하지 마세요.
         # 현재는 캐시에서 반환 (예시)
         user_tags = self.tag_cache.get(user_id, {})
 
-        tags_with_stats = [
+        sorted_tags = sorted(
+            user_tags.items(),
+            key=lambda x: x[1]["count"],
+            reverse=True
+        )[:limit]
+
+        return [
             {
                 "tag": tag,
-                "count": count,
-                "last_used": None  # DB에서 가져와야 함
+                "count": data["count"],
+                "last_used": data.get("last_used", "")
             }
-            for tag, count in sorted(
-                user_tags.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )[:limit]
+            for tag, data in sorted_tags
         ]
-
-        return tags_with_stats
 
     async def autocomplete_tags(
         self,
         prefix: str,
-        user_id: str,
+        user_id: Optional[str] = None,
         limit: int = 10
     ) -> List[str]:
         """
         태그 자동완성
 
         Args:
-            prefix: 태그 접두사
-            user_id: 사용자 ID
+            prefix: 검색할 접두어
+            user_id: 사용자 ID (선택사항)
             limit: 결과 개수
 
         Returns:
-            List[str]: 자동완성 제안
+            List[str]: 추천 태그 목록
         """
         # TODO: 실제 DB에서 조회
-        # 현재는 캐시에서 필터링 (예시)
-        user_tags = self.tag_cache.get(user_id, {})
+        # 현재는 캐시에서 검색 (예시)
+        all_tags = set()
 
+        if user_id and user_id in self.tag_cache:
+            all_tags.update(self.tag_cache[user_id].keys())
+
+        # 전체 캐시에서도 검색
+        for tags_dict in self.tag_cache.values():
+            all_tags.update(tags_dict.keys())
+
+        # 접두어 매칭
         prefix_lower = prefix.lower()
         matching_tags = [
-            tag for tag in user_tags.keys()
+            tag for tag in all_tags
             if tag.lower().startswith(prefix_lower)
         ]
 
-        # 빈도순 정렬
-        matching_tags.sort(key=lambda t: user_tags[t], reverse=True)
-
-        return matching_tags[:limit]
-
-    def record_tag_usage(self, user_id: str, tags: List[str]):
-        """태그 사용 기록 (캐시 업데이트)"""
-        if user_id not in self.tag_cache:
-            self.tag_cache[user_id] = {}
-
-        for tag in tags:
-            self.tag_cache[user_id][tag] = self.tag_cache[user_id].get(tag, 0) + 1
+        return sorted(matching_tags)[:limit]
 
 
 # 싱글톤 인스턴스 생성을 위한 팩토리 함수
 _tag_service_instance = None
 
 
-def get_tag_service(ollama_service) -> TagService:
+def get_tag_service(ollama_service, default_model: str = "llama3.2:latest") -> TagService:
     """TagService 싱글톤 인스턴스 반환"""
     global _tag_service_instance
     if _tag_service_instance is None:
-        _tag_service_instance = TagService(ollama_service)
+        _tag_service_instance = TagService(
+            ollama_service=ollama_service,
+            default_model=default_model
+        )
     return _tag_service_instance

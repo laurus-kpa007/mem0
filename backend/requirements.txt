@@ -19,10 +19,13 @@ pydantic-settings>=2.1.0,<3.0.0
 # Vector database
 qdrant-client>=1.7.0,<2.0.0
 
-# Additional dependencies for mem0
+# Additional dependencies
 typing-extensions>=4.8.0
-openai>=1.0.0  # mem0가 사용할 수 있음
-anthropic>=0.7.0  # mem0가 사용할 수 있음
+
+# Optional: Cloud LLM providers (NOT required when using Ollama)
+# Uncomment only if you want to use OpenAI or Anthropic instead of Ollama
+# openai>=1.0.0
+# anthropic>=0.7.0
 
 # Optional: Development and testing
 # pytest>=7.4.0,<8.0.0
